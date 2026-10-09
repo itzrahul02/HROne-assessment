@@ -15,4 +15,4 @@ python sample_seed.py
 uvicorn app.main:app --port 8000
 ```
 
-`GET /health` returns 200 only when MongoDB answers. Indexes are created at startup. MongoDB 6.0 or newer. No connection string is hard-coded. A local screen is at `/ui`.
+`GET /health` returns 200 only when MongoDB answers. Indexes are created at startup. MongoDB 6.0 or newer. No connection string is hard-coded. The graded API does not serve a page; the optional React screen is in `frontend/`.
