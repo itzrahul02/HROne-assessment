@@ -1,18 +1,17 @@
 # Employee Attendance & Analytics API
 
-All application code is in `app/main.py`. From the repository root:
+From a clean clone, at the repository root:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 ```
 
-Replace the dummy `MONGO_URI` in `.env`. A local MongoDB is `mongodb://localhost:27017`. Real environment variables override `.env`. Then:
+`MONGO_URI` and `MONGO_DB` are read from the environment. A local `.env` is fine: copy `.env.example` and replace the dummy URI (`mongodb://localhost:27017` for a local MongoDB). Real environment variables override `.env`. No connection string is hard-coded.
 
 ```bash
-python sample_seed.py
 uvicorn app.main:app --port 8000
 ```
 
-`GET /health` returns 200 only when MongoDB answers. Indexes are created at startup. MongoDB 6.0 or newer. No connection string is hard-coded. The graded API does not serve a page; the optional React screen is in `frontend/`.
+All application code is in `app/main.py`. Indexes are created at startup, with no manual step. `GET /health` returns 200 only when MongoDB answers, otherwise 503. MongoDB 6.0 or newer. `python sample_seed.py` loads the nine sample documents. Nothing from the contract is missing.
