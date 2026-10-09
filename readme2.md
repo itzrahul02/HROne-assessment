@@ -71,3 +71,97 @@ The three views match the API: employees (create and filter), attendance (punch 
 ## What to say if they ask “why”
 
 Indexes exist so the explain endpoint cannot fall into a collection scan, and so create and punch-in are safe under two concurrent requests. Derived fields are stored because the aggregations are required to trust them. Half-up is explicit because the language default would mark 1.01 hours as 1.00. Overnight shifts use minute numbers because string order lies. The React app is a desk for the same contract, not a second backend.
+
+## Deploy later
+
+Keep the files in this section out of the assessment repository until after you submit. The problem forbids a Dockerfile in the submission. Copy them into a `deploy/` folder only when you are ready to ship.
+
+The screen calls `/health`, `/employees`, `/attendance`, `/analytics`, and `/admin` on the same origin. `npm run dev` proxies those paths to port 8000. A production build has no proxy, so one web server must serve `frontend/dist` and forward those five paths to uvicorn. That keeps the browser and the API on one origin, so the existing `fetch` calls work with no frontend change.
+
+Use MongoDB Atlas for the database. Create a database user, allow the host’s IP (or `0.0.0.0/0` if the host IP changes), and create an empty database named `attendance_db`. Leave `attendance_test` alone; the tests wipe that name. The URI looks like `mongodb+srv://USER:PASSWORD@your-cluster.example.mongodb.net/?retryWrites=true&w=majority`. Put it in the host’s environment as `MONGO_URI`. Set `MONGO_DB=attendance_db`. A real environment variable wins over `.env`.
+
+Inside a container, uvicorn must listen on every interface. The graded command stays `uvicorn app.main:app --port 8000` because the grader calls localhost. The container command adds `--host 0.0.0.0`.
+
+Create `deploy/Dockerfile`:
+
+```dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app ./app
+COPY sample_seed.py .
+COPY sample_data ./sample_data
+
+ENV MONGO_DB=attendance_db
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Create `deploy/nginx.conf`:
+
+```nginx
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+
+    location /health     { proxy_pass http://api:8000; }
+    location /employees  { proxy_pass http://api:8000; }
+    location /attendance { proxy_pass http://api:8000; }
+    location /analytics  { proxy_pass http://api:8000; }
+    location /admin      { proxy_pass http://api:8000; }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+Create `deploy/Dockerfile.web`:
+
+```dockerfile
+FROM nginx:1.27-alpine
+COPY frontend/dist /usr/share/nginx/html
+COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
+```
+
+Create `deploy/docker-compose.yml`:
+
+```yaml
+services:
+  api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    environment:
+      MONGO_URI: ${MONGO_URI}
+      MONGO_DB: ${MONGO_DB}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+```
+
+From the repository root, with `MONGO_URI` and `MONGO_DB` exported in the shell (or in a `.env` next to the compose file, and that `.env` stays uncommitted):
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+docker compose -f deploy/docker-compose.yml up --build -d
+docker compose -f deploy/docker-compose.yml exec api python sample_seed.py
+curl http://localhost:8080/health
+```
+
+`/health` should return `{"status":"ok"}`. Open http://localhost:8080 and create an employee. The seed command is optional; Atlas can start empty.
+
+On a public machine, store `MONGO_URI` as a secret, open Atlas to that machine, and put HTTPS in front of port 8080. The API process still reads only `MONGO_URI` and `MONGO_DB`. Indexes are created when the process starts.
