@@ -72,7 +72,7 @@ export default function App() {
             <p>{sub}</p>
           </div>
           <p className={health === "ok" ? "health ok" : health === "bad" ? "health bad" : "health"}>
-            {health === "ok" ? "MongoDB connected" : health === "bad" ? "MongoDB not reachable" : "Checking MongoDB…"}
+            {health === "ok" ? "Working" : health === "bad" ? "Failed" : "Checking..."}
           </p>
         </header>
         {banner && <p className={`banner ${banner.kind}`}>{banner.message}</p>}
